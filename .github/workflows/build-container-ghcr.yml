@@ -9,6 +9,7 @@ on:
       - "container/**"
  
 permissions:
+  contents: read
   packages: write
  
 jobs:

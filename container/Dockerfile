@@ -13,12 +13,9 @@ RUN sudo apt update && \
     sudo apt install -y bsdextrautils npm jq iputils-ping sshpass ncat rlwrap \
     bloodyad coercer enum4linux-ng pwncat chisel-common-binaries \
     dirsearch yq krb5-user gitleaks naabu nikto netexec adb \
-    cmake build-essential && \
+    python3-pwntools python3-pymongo && \
     sudo apt clean && \
     sudo rm -rf /var/lib/apt/lists/*
- 
-# unicorn ships no cp314 wheel, so pip builds it from source and needs cmake.
-RUN pip3 install pwntools pymongo --break-system-packages
  
 RUN sudo npm install -g @playwright/cli@latest
  

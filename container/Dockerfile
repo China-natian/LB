@@ -13,7 +13,9 @@ RUN sudo apt update && \
     sudo apt install -y bsdextrautils npm jq iputils-ping sshpass ncat rlwrap \
     bloodyad coercer enum4linux-ng pwncat chisel-common-binaries \
     dirsearch yq krb5-user gitleaks naabu nikto netexec adb \
-    python3-pwntools python3-pymongo && \
+    python3-pwntools python3-pymongo python3-redis python3-pymysql python3-dev \
+    redis-tools certipy-ad jadx feroxbuster cmake pkg-config strace cpio seclists && \
+    sudo ln -sf "$(ls /usr/share/chisel-common-binaries/chisel_*_linux_amd64 | head -1)" /usr/local/bin/chisel && \
     sudo apt clean && \
     sudo rm -rf /var/lib/apt/lists/*
 

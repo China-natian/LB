@@ -16,7 +16,8 @@
     * proxychains
     * ...
 ## chisel
-chisel 二进制程序在 /usr/share/chisel-common-binaries 下面
+* `chisel` 已在 PATH 中（linux amd64 版本）。
+* 其他平台/架构的二进制在 /usr/share/chisel-common-binaries 下面，需要上传到目标机时从该目录取对应的文件。
 
 # Skills（按需加载）
 * 可复用的攻击/验证方法放在 /home/kali/skills 下，每个 skill 是一个目录，含 SKILL.md。
@@ -28,6 +29,7 @@ chisel 二进制程序在 /usr/share/chisel-common-binaries 下面
 * Maven：mvn（使用说明见 /home/kali/tools/jars 中的依赖）。
 * 反序列化常用依赖：/home/kali/tools/jars（shiro-core 1.2.4、commons-beanutils 1.9.2、commons-collections 3.2.1、commons-logging、slf4j-api）。
 * ysoserial：/home/kali/tools/ysoserial.jar；用 JDK 8 生成与运行 payload，避免高版本 JDK 的模块限制。
+* 反编译目标 class/jar：jadx（`jadx -d out app.jar`），或 `unzip` + `javap`。
 
 # 反弹Shell，数据外带 OOB，多层网络，XSS 数据外发
 * 对外回调地址由任务提示中的 “Worker network environment” 段落给出，形如 `IP:PORT` 或单独的 `IP`。
@@ -41,3 +43,4 @@ chisel 二进制程序在 /usr/share/chisel-common-binaries 下面
     * ...
 * 需要持续运行，或者共享给之后阶段的交互式命令，可以在 **tmux** 会话中运行，最后输出结论和总结的时候要说清楚 tmux 会话信息
     * 比如持续运行的用于接收数据的 HTTP服务，nc 接听反弹的Shell 等
+* 字典：/usr/share/seclists、/usr/share/wordlists（rockyou.txt.gz）

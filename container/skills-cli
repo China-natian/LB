@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""List or print skills synced into the worker container.
+
+A skill is a directory containing SKILL.md with YAML frontmatter:
+
+    ---
+    name: shiro-deserialization
+    description: When to use this skill
+    ---
+    body...
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+from pathlib import Path
+
+SKILLS_DIR = Path(os.environ.get("LB_SKILLS_DIR", "/home/kali/skills"))
+MAX_PREVIEW = 200
+
+
+def _frontmatter(text: str) -> tuple[dict[str, str], str]:
+    if not text.startswith("---"):
+        return {}, text
+    end = text.find("\n---", 3)
+    if end == -1:
+        return {}, text
+    header = text[3:end].strip("\n")
+    body = text[end + 4:].lstrip("\n")
+    fields: dict[str, str] = {}
+    for line in header.splitlines():
+        if ":" in line and not line.startswith(" "):
+            key, value = line.split(":", 1)
+            fields[key.strip()] = value.strip().strip("'\"")
+    return fields, body
+
+
+def _skills() -> list[Path]:
+    if not SKILLS_DIR.is_dir():
+        return []
+    return sorted(path for path in SKILLS_DIR.iterdir() if (path / "SKILL.md").is_file())
+
+
+def _summary(skill: Path) -> str:
+    fields, _ = _frontmatter((skill / "SKILL.md").read_text(encoding="utf-8"))
+    description = " ".join(fields.get("description", "No description.").split())
+    if len(description) > MAX_PREVIEW:
+        description = description[:MAX_PREVIEW] + "..."
+    return f"{skill.name}: {description}"
+
+
+def _cmd_list() -> int:
+    skills = _skills()
+    if not skills:
+        print(f"No skills available under {SKILLS_DIR}.")
+        return 0
+    print(f"Skills available under {SKILLS_DIR} (read one with `skills show <name>`):")
+    for skill in skills:
+        print(f"- {_summary(skill)}")
+    return 0
+
+
+def _cmd_show(name: str) -> int:
+    skill = SKILLS_DIR / name
+    path = skill / "SKILL.md"
+    if not path.is_file():
+        print(f"Unknown skill: {name}", file=sys.stderr)
+        print("Run `skills list` to see available skills.", file=sys.stderr)
+        return 2
+    print(path.read_text(encoding="utf-8"))
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="skills", description="List or print worker skills.")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers.add_parser("list", help="list available skills")
+    show = subparsers.add_parser("show", help="print a skill's SKILL.md")
+    show.add_argument("name")
+    args = parser.parse_args(argv)
+    if args.command == "list":
+        return _cmd_list()
+    return _cmd_show(args.name)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

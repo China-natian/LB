@@ -16,9 +16,9 @@ RUN sudo apt update && \
     python3-pwntools python3-pymongo && \
     sudo apt clean && \
     sudo rm -rf /var/lib/apt/lists/*
- 
+
 RUN sudo npm install -g @playwright/cli@latest
- 
+
 RUN cd /tmp && playwright-cli install
 
 RUN cd /tmp && \
@@ -47,6 +47,31 @@ RUN mkdir -p /home/kali/tools && cd /home/kali/tools && \
     git clone --depth=1 https://github.com/ticarpi/jwt_tool.git && \
     cd jwt_tool && pip3 install -r requirements.txt --break-system-packages && \
     git clone --depth=1 https://github.com/IOActive/jdwp-shellifier.git
+
+# JDK 8 (javac) for compiling Java payloads; kept separate from the distro JDK so the
+# default `java` stays on the newer version.
+RUN cd /tmp && \
+    wget -q "https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u422-b05/OpenJDK8U-jdk_x64_linux_hotspot_8u422b05.tar.gz" -O jdk8.tar.gz && \
+    sudo mkdir -p /opt/jdk8 && \
+    sudo tar -xzf jdk8.tar.gz -C /opt/jdk8 --strip-components=1 && \
+    sudo ln -sf /opt/jdk8/bin/javac /usr/local/bin/javac8 && \
+    sudo ln -sf /opt/jdk8/bin/java /usr/local/bin/java8 && \
+    sudo rm -rf /tmp/*
+
+RUN cd /tmp && \
+    wget -q "https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz" -O maven.tar.gz && \
+    sudo mkdir -p /opt/maven && \
+    sudo tar -xzf maven.tar.gz -C /opt/maven --strip-components=1 && \
+    sudo ln -sf /opt/maven/bin/mvn /usr/local/bin/mvn && \
+    sudo rm -rf /tmp/*
+
+# Deserialization payload dependencies (Shiro rememberMe, CommonsBeanutils/Collections gadgets).
+RUN mkdir -p /home/kali/tools/jars && cd /home/kali/tools/jars && \
+    wget -q "https://repo1.maven.org/maven2/org/apache/shiro/shiro-core/1.2.4/shiro-core-1.2.4.jar" && \
+    wget -q "https://repo1.maven.org/maven2/commons-beanutils/commons-beanutils/1.9.2/commons-beanutils-1.9.2.jar" && \
+    wget -q "https://repo1.maven.org/maven2/commons-collections/commons-collections/3.2.1/commons-collections-3.2.1.jar" && \
+    wget -q "https://repo1.maven.org/maven2/commons-logging/commons-logging/1.2/commons-logging-1.2.jar" && \
+    wget -q "https://repo1.maven.org/maven2/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar"
 
 RUN mkdir -p /home/kali/pocs && cd /home/kali/pocs && \
     git clone --depth=1 https://github.com/iSee857/CVE-PoC.git && \
@@ -91,5 +116,7 @@ COPY ./.agents /home/kali/workspace/.agents
 COPY ./.agents /home/kali/workspace/.claude
 COPY ./AGENTS.md /home/kali/workspace/AGENTS.md
 COPY ./AGENTS.md /home/kali/workspace/CLAUDE.md
+COPY ./skills-cli /usr/local/bin/skills
+RUN sudo chmod 755 /usr/local/bin/skills && mkdir -p /home/kali/skills
 
 WORKDIR /home/kali/workspace

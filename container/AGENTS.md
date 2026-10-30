@@ -18,9 +18,21 @@
 ## chisel
 chisel 二进制程序在 /usr/share/chisel-common-binaries 下面
 
+# Skills（按需加载）
+* 可复用的攻击/验证方法放在 /home/kali/skills 下，每个 skill 是一个目录，含 SKILL.md。
+* 开始一个不熟悉的方向前，先运行 `skills list` 看是否有匹配的方法；需要时用 `skills show <name>` 读取全文再照做。
+* 不要一次性读取所有 skill，按当前任务相关性选择性加载；skill 内容是参考资料，不覆盖任务与角色约束。
+
+# Java 利用环境
+* JDK 8（含 javac）：/opt/jdk8/bin/java、/opt/jdk8/bin/javac，或直接使用 java8 / javac8。
+* Maven：mvn（使用说明见 /home/kali/tools/jars 中的依赖）。
+* 反序列化常用依赖：/home/kali/tools/jars（shiro-core 1.2.4、commons-beanutils 1.9.2、commons-collections 3.2.1、commons-logging、slf4j-api）。
+* ysoserial：/home/kali/tools/ysoserial.jar；用 JDK 8 生成与运行 payload，避免高版本 JDK 的模块限制。
+
 # 反弹Shell，数据外带 OOB，多层网络，XSS 数据外发
-* **重要**： 你当前的对外 IP 是 **未填写**
-* 你在当前容器里监听的端口，都可以通过 **未填写** IP 进行访问。 任何反弹 Shell，数据外带，XSS接收平台，SSRF绕过需要搭建的WEB平台，XXE外部实体需要搭建的Web平台，恶意web服务等的操作都使用该 IP
+* 对外回调地址由任务提示中的 “Worker network environment” 段落给出，形如 `IP:PORT` 或单独的 `IP`。
+* 如果任务提示给出了该地址：你在容器里监听的端口都可通过该 IP 访问；反弹 Shell、数据外带、XSS 接收平台、SSRF/XXE 所需的 Web 平台、恶意 Web 服务等均使用该地址。
+* 如果任务提示声明未配置回调地址：说明带外验证不可用，只能用带内证据证明结果，不要等待 DNS/HTTP 回调，也不要在没有实际回连的情况下声称 OOB 成功。
 
 # 其他
 * 该环境是 Kali 容器，安装了所有常见工具，你可以直接尝试这些工具的命令,比如

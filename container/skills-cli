@@ -29,10 +29,30 @@ def _frontmatter(text: str) -> tuple[dict[str, str], str]:
     header = text[3:end].strip("\n")
     body = text[end + 4:].lstrip("\n")
     fields: dict[str, str] = {}
+    key: str | None = None
+    parts: list[str] = []
+
+    def flush() -> None:
+        if key is not None:
+            fields[key] = " ".join(" ".join(parts).split()).strip("'\"")
+
     for line in header.splitlines():
-        if ":" in line and not line.startswith(" "):
-            key, value = line.split(":", 1)
-            fields[key.strip()] = value.strip().strip("'\"")
+        if line[:1] in (" ", "\t"):
+            if key is not None:
+                parts.append(line.strip())
+            continue
+        flush()
+        key = None
+        parts = []
+        if ":" not in line:
+            continue
+        name, value = line.split(":", 1)
+        key = name.strip()
+        value = value.strip()
+        # YAML block scalars (>, |, >-, ...) continue on indented lines.
+        if value not in {"|", "|-", "|+", ">", ">-", ">+"}:
+            parts.append(value)
+    flush()
     return fields, body
 
 

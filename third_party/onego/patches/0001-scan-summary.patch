@@ -1,0 +1,394 @@
+diff -ruN upstream/core/options.go build-src/core/options.go
+--- upstream/core/options.go	2026-08-06 11:01:12
++++ build-src/core/options.go	2026-11-06 10:43:00
+@@ -36,6 +36,7 @@
+ 	Tee             bool   `long:"tee" description:"Bool, keep console output"`          // 是否开启命令行输出扫描结果
+ 	Quiet           bool   `short:"q" long:"quiet" description:"Bool, close log output"` // 是否开启命令行输出日志
+ 	NoGuess         bool   `long:"no-guess" description:"Bool, omit guessed frameworks when formatting results"`
++	SummaryFile     string `long:"summary" description:"File, write machine-readable scan summary (JSON)"`
+ }
+ 
+ type SmartOption struct {
+diff -ruN upstream/core/runner.go build-src/core/runner.go
+--- upstream/core/runner.go	2026-08-06 11:02:13
++++ build-src/core/runner.go	2026-11-06 10:43:57
+@@ -71,6 +71,9 @@
+ 	}
+ 
+ 	r.PrepareConfig()
++	if r.SummaryFile != "" {
++		ResetScanSummary()
++	}
+ 
+ 	if r.Exclude != "" {
+ 		r.Config.Excludes = utils.ParseCIDRs(strings.Split(r.Exclude, ","))
+@@ -438,6 +441,14 @@
+ 	}
+ 	if fileutils.IsExist(config.Filename + "_extract") {
+ 		logs.Log.Important("extractor result: " + config.Filename + "_extract")
++	}
++
++	if r.SummaryFile != "" {
++		if err := WriteScanSummary(r.SummaryFile); err != nil {
++			logs.Log.Errorf("write scan summary %s error: %v", r.SummaryFile, err)
++		} else {
++			logs.Log.Important("Scan summary: " + r.SummaryFile)
++		}
+ 	}
+ }
+ 
+diff -ruN upstream/engine/Dispatch.go build-src/engine/Dispatch.go
+--- upstream/engine/Dispatch.go	2026-08-06 11:25:50
++++ build-src/engine/Dispatch.go	2026-11-06 10:42:57
+@@ -15,6 +15,7 @@
+ 
+ func Dispatch(opt *pkg.RunnerOption, result *pkg.Result) {
+ 	timer := time.Now()
++	defer pkg.RecordScanResult(result)
+ 	defer func() {
+ 		result.Timing = int64(time.Since(timer) / time.Millisecond)
+ 		if err := recover(); err != nil {
+@@ -24,6 +25,7 @@
+ 	}()
+ 	atomic.AddInt32(&RunSum, 1)
+ 	if opt.ExcludeCIDRs != nil && opt.ExcludeCIDRs.ContainsString(result.Ip) {
++		result.Excluded = true
+ 		logs.Log.Debug("exclude ip: " + result.Ip)
+ 		return
+ 	}
+diff -ruN upstream/pkg/result.go build-src/pkg/result.go
+--- upstream/pkg/result.go	2026-08-06 11:01:12
++++ build-src/pkg/result.go	2026-11-06 10:42:54
+@@ -30,6 +30,7 @@
+ 	IsHttp     bool              `json:"-"`
+ 	Filtered   bool              `json:"-"`
+ 	Open       bool              `json:"-"`
++	Excluded   bool              `json:"-"`
+ 	SmartProbe bool              `json:"-"`
+ 	TcpConn    *net.Conn         `json:"-"`
+ 	HttpConn   *http.Client      `json:"-"`
+diff -ruN upstream/pkg/summary.go build-src/pkg/summary.go
+--- upstream/pkg/summary.go	1970-01-01 08:00:00
++++ build-src/pkg/summary.go	2026-11-06 10:42:46
+@@ -0,0 +1,207 @@
++package pkg
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"sort"
++	"strconv"
++	"strings"
++	"sync"
++	"time"
++)
++
++const ScanSummarySchema = "onego.scan-summary.v1"
++
++// ScanTargetSummary is the machine-readable coverage record for one target.
++// Tested counts unique numeric ports that reached a scan outcome; open_ports
++// lists only ports confirmed open. Closed, filtered, error and unknown are
++// distinct: only closed is evidence that a port is not listening.
++type ScanTargetSummary struct {
++	Tested    int            `json:"tested"`
++	Open      int            `json:"open"`
++	Closed    int            `json:"closed"`
++	Filtered  int            `json:"filtered"`
++	Error     int            `json:"error"`
++	Unknown   int            `json:"unknown"`
++	Excluded  int            `json:"excluded"`
++	OpenPorts []string       `json:"open_ports"`
++	Special   map[string]int `json:"special,omitempty"`
++
++	ports map[string]string
++}
++
++type ScanSummary struct {
++	Schema     string                        `json:"schema"`
++	StartedAt  string                        `json:"started_at"`
++	FinishedAt string                        `json:"finished_at,omitempty"`
++	Targets    map[string]*ScanTargetSummary `json:"targets"`
++}
++
++var (
++	summaryMu     sync.Mutex
++	activeSummary *ScanSummary
++)
++
++func ResetScanSummary() {
++	summaryMu.Lock()
++	defer summaryMu.Unlock()
++	activeSummary = &ScanSummary{
++		Schema:    ScanSummarySchema,
++		StartedAt: time.Now().UTC().Format(time.RFC3339),
++		Targets:   map[string]*ScanTargetSummary{},
++	}
++}
++
++func summary() *ScanSummary {
++	if activeSummary == nil {
++		activeSummary = &ScanSummary{
++			Schema:    ScanSummarySchema,
++			StartedAt: time.Now().UTC().Format(time.RFC3339),
++			Targets:   map[string]*ScanTargetSummary{},
++		}
++	}
++	return activeSummary
++}
++
++// RecordScanResult is called once per dispatched target:port after the scan
++// outcome is known. It is intentionally cheap and lock-protected because
++// Dispatch runs concurrently.
++func RecordScanResult(result *Result) {
++	if result == nil {
++		return
++	}
++	target := result.Ip
++	if target == "" {
++		target = "unknown"
++	}
++	summaryMu.Lock()
++	defer summaryMu.Unlock()
++	record := summary().Targets[target]
++	if record == nil {
++		record = &ScanTargetSummary{ports: map[string]string{}, Special: map[string]int{}}
++		summary().Targets[target] = record
++	}
++	if result.Excluded {
++		record.Excluded++
++		return
++	}
++	port := strings.TrimSpace(result.Port)
++	number, err := strconv.Atoi(port)
++	if err != nil || number < 1 || number > 65535 {
++		if port != "" {
++			record.Special[port]++
++		}
++		return
++	}
++	state := classifyResult(result)
++	if previous, ok := record.ports[port]; !ok || stateRank(state) > stateRank(previous) {
++		record.ports[port] = state
++	}
++}
++
++func stateRank(state string) int {
++	switch state {
++	case "open":
++		return 4
++	case "closed":
++		return 3
++	case "filtered":
++		return 2
++	case "error":
++		return 1
++	default:
++		return 0
++	}
++}
++
++func classifyResult(result *Result) string {
++	if result.Open {
++		return "open"
++	}
++	message := strings.ToLower(result.Error)
++	switch {
++	case strings.Contains(message, "refused"):
++		return "closed"
++	case strings.Contains(message, "timeout"), strings.Contains(message, "deadline exceeded"):
++		return "filtered"
++	case strings.Contains(message, "permission denied"),
++		strings.Contains(message, "no route"),
++		strings.Contains(message, "unreachable"),
++		strings.Contains(message, "host is down"),
++		strings.Contains(message, "no such host"):
++		return "error"
++	}
++	switch result.ErrStat {
++	case 1:
++		return "closed"
++	case 2:
++		return "filtered"
++	case 3, 4, 5, 6:
++		return "error"
++	}
++	return "unknown"
++}
++
++// WriteScanSummary writes the collected summary atomically. A missing file is
++// safer than a fabricated "complete" claim, so callers must treat write errors
++// as unknown coverage.
++func WriteScanSummary(path string) error {
++	if strings.TrimSpace(path) == "" {
++		return nil
++	}
++	summaryMu.Lock()
++	snapshot := summary()
++	for _, record := range snapshot.Targets {
++		finalize(record)
++	}
++	payload, err := json.MarshalIndent(snapshot, "", "  ")
++	summaryMu.Unlock()
++	if err != nil {
++		return err
++	}
++	directory := filepath.Dir(path)
++	if directory != "" && directory != "." {
++		if err := os.MkdirAll(directory, 0o755); err != nil {
++			return err
++		}
++	}
++	temporary := path + ".tmp"
++	if err := os.WriteFile(temporary, append(payload, '\n'), 0o644); err != nil {
++		return err
++	}
++	return os.Rename(temporary, path)
++}
++
++func finalize(record *ScanTargetSummary) {
++	record.Tested = len(record.ports)
++	record.Open = 0
++	record.Closed = 0
++	record.Filtered = 0
++	record.Error = 0
++	record.Unknown = 0
++	record.OpenPorts = record.OpenPorts[:0]
++	for port, state := range record.ports {
++		switch state {
++		case "open":
++			record.Open++
++			record.OpenPorts = append(record.OpenPorts, port)
++		case "closed":
++			record.Closed++
++		case "filtered":
++			record.Filtered++
++		case "error":
++			record.Error++
++		default:
++			record.Unknown++
++		}
++	}
++	sort.Slice(record.OpenPorts, func(i, j int) bool {
++		left, _ := strconv.Atoi(record.OpenPorts[i])
++		right, _ := strconv.Atoi(record.OpenPorts[j])
++		return left < right
++	})
++	if len(record.Special) == 0 {
++		record.Special = nil
++	}
++}
+diff -ruN upstream/pkg/summary_test.go build-src/pkg/summary_test.go
+--- upstream/pkg/summary_test.go	1970-01-01 08:00:00
++++ build-src/pkg/summary_test.go	2026-11-06 10:45:04
+@@ -0,0 +1,110 @@
++package pkg
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"testing"
++
++	"github.com/chainreactors/utils/parsers"
++)
++
++func scanResult(ip, port string) *Result {
++	return &Result{GOGOResult: &parsers.GOGOResult{Ip: ip, Port: port}}
++}
++
++func TestScanSummaryClassification(t *testing.T) {
++	ResetScanSummary()
++	open := scanResult("10.0.0.1", "22")
++	open.Open = true
++	refused := scanResult("10.0.0.1", "80")
++	refused.Error = "connect: connection refused"
++	timeout := scanResult("10.0.0.1", "443")
++	timeout.Error = "i/o timeout"
++	denied := scanResult("10.0.0.1", "3306")
++	denied.Error = "permission denied"
++	unknown := scanResult("10.0.0.1", "8080")
++	special := scanResult("10.0.0.1", "snmp")
++	special.Open = true
++	excluded := scanResult("10.0.0.2", "")
++	excluded.Excluded = true
++
++	for _, result := range []*Result{open, refused, timeout, denied, unknown, special, excluded} {
++		RecordScanResult(result)
++	}
++
++	path := filepath.Join(t.TempDir(), "summary.json")
++	if err := WriteScanSummary(path); err != nil {
++		t.Fatalf("write summary: %v", err)
++	}
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatalf("read summary: %v", err)
++	}
++	var summary ScanSummary
++	if err := json.Unmarshal(payload, &summary); err != nil {
++		t.Fatalf("decode summary: %v", err)
++	}
++	if summary.Schema != ScanSummarySchema {
++		t.Fatalf("schema = %q, want %q", summary.Schema, ScanSummarySchema)
++	}
++	first := summary.Targets["10.0.0.1"]
++	if first == nil {
++		t.Fatal("missing target 10.0.0.1")
++	}
++	if first.Tested != 5 {
++		t.Errorf("tested = %d, want 5", first.Tested)
++	}
++	if first.Open != 1 || first.Closed != 1 || first.Filtered != 1 || first.Error != 1 || first.Unknown != 1 {
++		t.Errorf("unexpected counts: %+v", first)
++	}
++	if len(first.OpenPorts) != 1 || first.OpenPorts[0] != "22" {
++		t.Errorf("open ports = %v, want [22]", first.OpenPorts)
++	}
++	if first.Special["snmp"] != 1 {
++		t.Errorf("special = %v, want snmp:1", first.Special)
++	}
++	second := summary.Targets["10.0.0.2"]
++	if second == nil || second.Excluded != 1 || second.Tested != 0 {
++		t.Fatalf("unexpected excluded target: %+v", second)
++	}
++}
++
++func TestScanSummaryDeduplicatesPorts(t *testing.T) {
++	ResetScanSummary()
++	refused := scanResult("10.0.0.1", "22")
++	refused.Error = "connection refused"
++	open := scanResult("10.0.0.1", "22")
++	open.Open = true
++	RecordScanResult(refused)
++	RecordScanResult(open)
++	RecordScanResult(refused)
++
++	path := filepath.Join(t.TempDir(), "summary.json")
++	if err := WriteScanSummary(path); err != nil {
++		t.Fatalf("write summary: %v", err)
++	}
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatalf("read summary: %v", err)
++	}
++	var summary ScanSummary
++	if err := json.Unmarshal(payload, &summary); err != nil {
++		t.Fatalf("decode summary: %v", err)
++	}
++	record := summary.Targets["10.0.0.1"]
++	if record.Tested != 1 {
++		t.Errorf("tested = %d, want 1", record.Tested)
++	}
++	if record.Open != 1 || record.Closed != 0 {
++		t.Errorf("open/closed = %d/%d, want 1/0", record.Open, record.Closed)
++	}
++}
++
++func TestScanSummaryIgnoresNilResult(t *testing.T) {
++	ResetScanSummary()
++	RecordScanResult(nil)
++	if got := len(summary().Targets); got != 0 {
++		t.Fatalf("targets = %d, want 0", got)
++	}
++}

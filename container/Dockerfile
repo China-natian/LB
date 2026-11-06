@@ -1,3 +1,25 @@
+# Build onego (patched gogo) inside the image so hosts do not need a Go
+# toolchain and the binary always matches third_party/onego/patches.
+FROM --platform=$BUILDPLATFORM golang:1.25-bookworm AS onego-build
+WORKDIR /src
+COPY third_party/onego/build-src/ /src/
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
+    -tags "forceposix,noembed,osusergo,netgo" \
+    -ldflags "-s -w -X 'github.com/chainreactors/onego/v2/core.ver=lb-1'" \
+    -o /out/onego .
+
+# Pinned helper binaries. Their release artifacts embed the credential rules and
+# dictionaries, so no template checkout or local Go toolchain is needed.
+FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS tools
+ARG ZOMBIE_VERSION=v1.3.0
+ARG SPRAY_VERSION=v0.3.2
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* && mkdir -p /out
+RUN curl -fsSL -o /out/zombie "https://github.com/chainreactors/zombie/releases/download/${ZOMBIE_VERSION}/zombie_linux_amd64" \
+    && echo "94cc277b812d5b056984fb2206d32d9911791feea7a0dc811c2b196a82666325  /out/zombie" | sha256sum -c -
+RUN curl -fsSL -o /out/spray "https://github.com/chainreactors/spray/releases/download/${SPRAY_VERSION}/spray_linux_amd64" \
+    && echo "5e6c778790a93c79110394a1c43f8d1902e20c69f5f03e544347fda7cf9863e8  /out/spray" | sha256sum -c -
+
 FROM --platform=amd64 kalilinux/kali-rolling:latest
 
 RUN apt update && \
@@ -166,12 +188,16 @@ ENV PYTHONUNBUFFERED=1
 
 RUN printf '%s\n' '{"hasCompletedOnboarding": true, "autoUpdaterStatus": "disabled"}' > /home/kali/.claude.json
 
-COPY ./.agents /home/kali/workspace/.agents
-COPY ./.agents /home/kali/workspace/.claude
-COPY ./AGENTS.md /home/kali/workspace/AGENTS.md
-COPY ./AGENTS.md /home/kali/workspace/CLAUDE.md
-COPY ./skills-cli /usr/local/bin/skills
-RUN sudo chmod 755 /usr/local/bin/skills && mkdir -p /home/kali/skills /home/kali/.local/bin
+COPY ./container/.agents /home/kali/workspace/.agents
+COPY ./container/.agents /home/kali/workspace/.claude
+COPY ./container/AGENTS.md /home/kali/workspace/AGENTS.md
+COPY ./container/AGENTS.md /home/kali/workspace/CLAUDE.md
+COPY ./container/skills-cli /usr/local/bin/skills
+COPY --from=onego-build /out/onego /usr/local/bin/onego
+COPY --from=tools /out/zombie /usr/local/bin/zombie
+COPY --from=tools /out/spray /usr/local/bin/spray
+RUN sudo chmod 755 /usr/local/bin/skills /usr/local/bin/onego /usr/local/bin/zombie /usr/local/bin/spray \
+    && mkdir -p /home/kali/skills /home/kali/.local/bin
 
 # kali-linux-headless can leave the home directory root-owned, which prevents the
 # worker CLI from creating ~/.codex or ~/.config at startup.

@@ -1,0 +1,496 @@
+/* onego 资产管理 · 深空暗色霓虹主题（对齐渗透测试工作平台配色） */
+:root {
+  --bg-main: #0D1220;
+  --bg-section: #141B2D;
+  --bg-card: #1B2440;
+  --bg-input: #0F1628;
+  --fg-text: #F4F7FE;
+  --fg-label: #D8E0F0;
+  --fg-hint: #9AA6C2;
+  --border: #2A3654;
+  --accent: #6C8CFF;
+  --accent-hover: #8AA4FF;
+  --accent2: #4FD1C5;
+  --danger: #E5636F;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg-main);
+  color: var(--fg-text);
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  font-size: 13px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ===== 顶栏 ===== */
+header {
+  background: #101828;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.brand {
+  font-size: 16px;
+  font-weight: 700;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  white-space: nowrap;
+}
+/* onego patch: 顶栏自适应——文件选择/搜索框弹性伸缩，状态文本截断，避免窄窗口生硬换行 */
+.file-bar { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
+.file-bar .hint {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-bar .btn { flex-shrink: 0; }
+select {
+  background: var(--bg-input);
+  color: var(--fg-text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  flex: 0 1 320px;
+  min-width: 150px;
+  outline: none;
+  text-overflow: ellipsis;
+}
+select:focus { border-color: var(--accent); }
+
+/* ===== 按钮 ===== */
+.btn {
+  background: #232E4D;
+  color: var(--fg-text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.btn:hover { background: #2E3B63; border-color: var(--accent); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); box-shadow: 0 0 12px rgba(108,140,255,.5); }
+.btn-sm { padding: 3px 10px; font-size: 12px; }
+.hint { color: var(--fg-hint); font-size: 12px; }
+
+/* ===== 霓虹渐变光条 ===== */
+.glow-bar {
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  flex-shrink: 0;
+}
+
+/* ===== 主区域 ===== */
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px;
+  overflow: hidden;
+}
+
+/* ===== 分类卡片 ===== */
+/* onego patch: auto-fit 自适应列数——宽窗口单行铺满，窄窗口自动换行，不再挤压变形 */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px;
+  flex-shrink: 0;
+}
+.card {
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 10px rgba(108,140,255,.35);
+  background: var(--bg-card);
+}
+.card .name { font-weight: 700; font-size: 12px; color: var(--accent-hover); }
+.card .stat { color: var(--fg-hint); font-size: 11px; margin-top: 3px; }
+
+/* ===== 面板 ===== */
+.panel {
+  flex: 1;
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ===== 分类 Tab ===== */
+.tabs { display: flex; gap: 2px; padding: 8px 8px 0; flex-wrap: wrap; }
+.tab {
+  background: transparent;
+  border: none;
+  color: var(--fg-hint);
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: all .15s ease;
+}
+.tab:hover { color: var(--fg-label); background: var(--bg-card); }
+.tab.active {
+  color: var(--accent-hover);
+  background: var(--bg-card);
+  font-weight: 700;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* ===== 筛选 ===== */
+/* onego patch: 筛选项过多时限高滚动，避免占据过多纵向空间压缩表格 */
+.filters { display: flex; gap: 6px; padding: 8px; flex-wrap: wrap; max-height: 84px; overflow-y: auto; flex-shrink: 0; }
+.filter-chip {
+  background: var(--bg-card);
+  color: var(--fg-text);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.filter-chip:hover { border-color: var(--accent); }
+.filter-chip.active { background: var(--accent); color: #fff; }
+
+/* ===== 表格 ===== */
+.table-wrap { flex: 1; overflow: auto; }
+/* onego patch: 固定列宽布局，保证各分类面板列对齐一致 */
+table { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 960px; }
+thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-card);
+  color: var(--fg-label);
+  font-size: 12px;
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+tbody td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #1C2540;
+  color: var(--fg-text);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+tbody tr:nth-child(even) { background: #182136; }
+tbody tr:hover { background: #223055; }
+td.len { color: var(--accent2); font-weight: 700; }
+td.status-2xx { color: var(--accent2); }
+td.status-3xx { color: #F5C76E; }
+td.status-4xx { color: #F2959E; }
+td.status-5xx { color: var(--danger); }
+td.vuln { color: #F27983; font-weight: 700; }
+
+/* onego patch: 表格文本可正常选择复制（双击选整格见 app.js） */
+#table tbody { user-select: text; }
+td.ip { font-family: "SF Mono", "JetBrains Mono", Consolas, monospace; }
+
+/* ===== 分页 ===== */
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.empty { text-align: center; color: var(--fg-hint); padding: 40px 0; }
+
+/* onego patch: 翻页按钮禁用态 */
+.pager button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ===== onego patch: 搜索框 ===== */
+.search-input {
+  background: var(--bg-input);
+  color: var(--fg-text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  /* 弹性伸缩：宽窗口充分展开，窄窗口收缩到最小可用宽度 */
+  flex: 1 1 200px;
+  min-width: 140px;
+  outline: none;
+}
+.search-input:focus { border-color: var(--accent); }
+.search-chip {
+  margin: 0 8px 4px;
+  padding: 4px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--fg-label);
+  font-size: 12px;
+  width: fit-content;
+}
+.search-chip b { color: var(--accent-hover); }
+.hidden { display: none !important; }
+
+/* ===== onego patch: 面板头部（Tab + 视图切换） ===== */
+.panel-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding-right: 8px;
+}
+/* onego patch: margin-left:auto 保证主机视图隐藏 Tab 后切换按钮仍固定靠右，不跳位 */
+.view-switch { display: flex; gap: 4px; flex-shrink: 0; margin-left: auto; }
+
+/* onego patch: 操作结果提示（导出路径等），居中浮层自动消失 */
+.toast {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
+  color: var(--fg-text);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.5);
+  max-width: 80%;
+  word-break: break-all;
+}
+.view-switch .btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ===== onego patch: 推测指纹弱化与标记点 ===== */
+.marks { margin-left: 6px; display: inline-flex; gap: 3px; vertical-align: middle; }
+.mark { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.mark-extracts { background: var(--accent); box-shadow: 0 0 4px rgba(108,140,255,.8); }
+.mark-cert { background: #B48CFF; box-shadow: 0 0 4px rgba(180,140,255,.8); }
+.mark-vuln { background: var(--danger); box-shadow: 0 0 4px rgba(229,99,111,.8); }
+
+/* ===== onego patch: IP 筛选图标 ===== */
+.ip-filter {
+  margin-left: 6px;
+  color: var(--fg-hint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .12s ease;
+}
+tbody tr:hover .ip-filter { opacity: 1; }
+.ip-filter:hover { color: var(--accent-hover); }
+
+/* ===== onego patch: 主机视图 ===== */
+.hosts-view { flex: 1; overflow: auto; }
+.hosts-table { table-layout: auto; min-width: 900px; }
+.hosts-table td.host-ports {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: "SF Mono", "JetBrains Mono", Consolas, monospace;
+  font-size: 11px;
+  color: var(--fg-hint);
+}
+.hosts-table td.host-services { color: var(--accent2); white-space: normal; }
+tr.host-row { cursor: pointer; }
+.host-sub-table { table-layout: fixed; min-width: 0; width: 100%; }
+.host-sub-table th {
+  position: static;
+  font-size: 11px;
+  padding: 4px 8px;
+  background: var(--bg-card);
+}
+.host-sub-table td { font-size: 12px; padding: 4px 8px; }
+tr.host-sub { cursor: pointer; }
+
+/* ===== onego patch: 可排序表头（开放端口数） ===== */
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable:hover { color: var(--accent-hover); }
+th.sortable .sort-arrow { color: var(--fg-hint); font-size: 10px; margin-left: 2px; }
+th.sortable.active { color: var(--accent-hover); }
+th.sortable.active .sort-arrow { color: var(--accent2); }
+
+/* ===== onego patch: 主机端口列表弹出卡片 ===== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 18, 0.62);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-card {
+  width: min(960px, 92vw);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 44px rgba(0, 0, 0, 0.55);
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.modal-body { overflow: auto; padding: 10px 14px; }
+.modal-body .host-sub-table { table-layout: auto; min-width: 720px; }
+.modal-body tr.host-sub:hover td { background: var(--bg-card); }
+.modal-hint { margin-top: 8px; color: var(--fg-hint); font-size: 12px; }
+/* onego patch: 主机弹窗 Web/非 Web 分区小标题（可折叠） */
+.modal-section-title {
+  margin: 10px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  user-select: none;
+}
+.modal-section-title:hover { color: var(--accent-hover); }
+.modal-section:first-child .modal-section-title { margin-top: 0; }
+.collapse-arrow {
+  display: inline-block;
+  margin-right: 4px;
+  font-size: 10px;
+  transition: transform 0.15s ease;
+}
+.modal-section.collapsed .modal-section-body { display: none; }
+.modal-section.collapsed .collapse-arrow { transform: rotate(-90deg); }
+
+/* onego patch: 推测指纹（原版 gogo f.IsGuess()）灰色变淡斜体弱化展示，
+   与确定指纹的正常字体形成可信度区分 */
+.finger-guess {
+  color: var(--fg-hint);
+  font-style: italic;
+  opacity: 0.75;
+}
+.finger-guess-text {
+  color: var(--fg-hint);
+  font-style: italic;
+  opacity: 0.75;
+}
+
+/* ===== onego patch: 详情面板 ===== */
+.detail-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  /* 宽窗口 540px，窄窗口不超过 92% 视口宽 */
+  width: min(540px, 92vw);
+  height: 100vh;
+  background: var(--bg-section);
+  border-left: 1px solid var(--accent);
+  box-shadow: -8px 0 24px rgba(0,0,0,.5);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(105%);
+  transition: transform .2s ease;
+  /* 高于主机端口弹出卡片(z-index:200)，端口详情可覆盖在卡片之上 */
+  z-index: 300;
+}
+.detail-panel.open { transform: translateX(0); }
+.detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+  font-weight: 700;
+  font-family: "SF Mono", "JetBrains Mono", Consolas, monospace;
+}
+.detail-body {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 14px;
+  user-select: text;
+}
+.detail-section { margin-bottom: 16px; }
+.detail-section-title {
+  color: var(--accent-hover);
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+.detail-item { padding: 3px 0; line-height: 1.6; word-break: break-all; }
+.detail-item.dim { color: var(--fg-hint); }
+.detail-key { color: var(--fg-hint); }
+.detail-sub { color: var(--fg-hint); font-size: 11px; margin-left: 6px; }
+.detail-sub-block {
+  color: var(--fg-hint);
+  font-size: 11px;
+  font-family: "SF Mono", "JetBrains Mono", Consolas, monospace;
+  padding: 2px 8px 6px 14px;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+.searchable {
+  color: var(--accent2);
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+}
+/* onego patch: 确定指纹名白色正常字体（保留点击回填搜索交互），
+   与列表视图的确定指纹展示保持一致；推测指纹由 finger-guess-text 覆盖弱化 */
+.searchable:not(.finger-guess-text) { color: inherit; }
+.searchable:not(.finger-guess-text):hover { border-bottom-color: var(--fg-hint); }
+.searchable:hover { border-bottom-color: var(--accent2); }
+.searchable.focus { color: var(--danger); font-weight: 700; }
+.tag {
+  display: inline-block;
+  font-size: 10px;
+  border-radius: 3px;
+  padding: 0 5px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.tag-focus { background: rgba(229,99,111,.2); color: var(--danger); border: 1px solid var(--danger); }
+.tag-guess { background: rgba(154,166,194,.15); color: var(--fg-hint); border: 1px solid var(--fg-hint); }
+.sev {
+  display: inline-block;
+  font-size: 10px;
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-right: 6px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.sev-critical { background: #B3273A; color: #fff; }
+.sev-high { background: rgba(242,121,131,.25); color: #F27983; border: 1px solid #F27983; }
+.sev-medium { background: rgba(245,199,110,.18); color: #F5C76E; border: 1px solid #F5C76E; }
+.sev-info { background: rgba(154,166,194,.15); color: var(--fg-hint); border: 1px solid var(--fg-hint); }
+.sev-unknown { background: rgba(154,166,194,.1); color: var(--fg-hint); }

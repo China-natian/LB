@@ -1,0 +1,57 @@
+//go:build tinygo && emptytemplates
+// +build tinygo,emptytemplates
+
+package pkg
+
+import (
+	"github.com/chainreactors/fingers/fingerprinthub"
+	"github.com/chainreactors/fingers/fingers"
+	"github.com/chainreactors/utils"
+	"github.com/chainreactors/utils/parsers"
+)
+
+var (
+	FingerEngine         *fingers.FingersEngine
+	FingerprintHubEngine *fingerprinthub.FingerPrintHubEngine
+	Extractor            []*parsers.Extractor
+	Extractors           = make(parsers.Extractors)
+	ExtractRegexps       = map[string][]*parsers.Extractor{}
+)
+
+func LoadFinger([]string) error {
+	engine, err := fingers.NewEngineWithPreset(fingers.Fingers{}, nil, utils.PrePort)
+	if err != nil {
+		return err
+	}
+	FingerEngine = engine
+
+	hub, err := fingerprinthub.NewFingerPrintHubEngine([]byte("[]"), []byte("[]"))
+	if err != nil {
+		return err
+	}
+	FingerprintHubEngine = hub
+
+	return nil
+}
+
+func LoadPortConfig(string) error {
+	utils.PrePort = utils.NewPortPreset(nil)
+	return nil
+}
+
+func LoadExtractor() error {
+	Extractor = nil
+	Extractors = make(parsers.Extractors)
+	ExtractRegexps = map[string][]*parsers.Extractor{}
+	return nil
+}
+
+func LoadWorkFlow() (WorkflowMap, error) {
+	return WorkflowMap{}, nil
+}
+
+type WorkflowMap map[string][]*Workflow
+
+func (m WorkflowMap) Choice(name string) []*Workflow {
+	return nil
+}

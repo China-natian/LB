@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>onego 资产管理</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">⚡ onego · 资产管理</div>
+  <div class="file-bar">
+    <select id="fileSelect"></select>
+    <button id="loadBtn" class="btn btn-primary">加载文件</button>
+    <button id="refreshBtn" class="btn">刷新列表</button>
+    <button id="exportBtn" class="btn">导出 CSV</button>
+    <input id="searchInput" class="search-input" placeholder="搜索 IP / 标题 / 指纹 / 提取信息（ip: 前缀精确匹配）">
+    <button id="searchBtn" class="btn">搜索</button>
+    <span id="loadInfo" class="hint"></span>
+  </div>
+</header>
+<div class="glow-bar"></div>
+
+<main>
+  <section id="cards" class="cards"></section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div id="tabs" class="tabs"></div>
+      <div class="view-switch">
+        <button id="viewListBtn" class="btn btn-sm active">列表视图</button>
+        <button id="viewHostsBtn" class="btn btn-sm">主机视图</button>
+      </div>
+    </div>
+    <div id="filters" class="filters"></div>
+    <div id="searchChip" class="search-chip hidden"></div>
+    <div class="table-wrap" id="listView">
+      <table id="table">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="hostsView" class="hosts-view hidden"></div>
+    <div class="pager" id="pager">
+      <button id="prevBtn" class="btn btn-sm">◀ 上一页</button>
+      <span id="pageInfo" class="hint"></span>
+      <button id="nextBtn" class="btn btn-sm">下一页 ▶</button>
+    </div>
+  </section>
+</main>
+
+<!-- onego patch: 主机端口列表弹出卡片（不挤占概览页，点击外围关闭） -->
+<div id="hostModal" class="modal-backdrop hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <span id="hostModalTitle"></span>
+      <button id="hostModalClose" class="btn btn-sm">✕</button>
+    </div>
+    <div id="hostModalBody" class="modal-body"></div>
+  </div>
+</div>
+
+<!-- onego patch: 端口信息详情面板（零信息丢失） -->
+<aside id="detailPanel" class="detail-panel">
+  <div class="detail-head">
+    <span id="detailTitle">详情</span>
+    <button id="detailClose" class="btn btn-sm">✕</button>
+  </div>
+  <div id="detailBody" class="detail-body"></div>
+</aside>
+<div id="toast" class="toast hidden"></div>
+<script src="app.js"></script>
+</body>
+</html>

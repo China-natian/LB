@@ -19,10 +19,17 @@
 * `chisel` 已在 PATH 中（linux amd64 版本）。
 * 其他平台/架构的二进制在 /usr/share/chisel-common-binaries 下面，需要上传到目标机时从该目录取对应的文件。
 
+# 端口与服务发现
+* TCP 端口发现默认用 onego（`onego --help`），按需再 `skills show port-and-service-inventory` 取完整流程；不要先用 nmap 扫 TCP 全端口。
+* nmap 只做补充：UDP、NSE 脚本、需要 nmap 专属脚本输出的场景。
+* 多个批量目标且 onego 已产出结果时，才把结果交给 zombie/spray 做弱口令与目录爆破；单个目标直接用对应专用工具。
+
 # Skills（按需加载）
 * 可复用的攻击/验证方法放在 /home/kali/skills 下，每个 skill 是一个目录，含 SKILL.md。
 * 开始一个不熟悉的方向前，先运行 `skills list` 看是否有匹配的方法；需要时用 `skills show <name>` 读取全文再照做。
 * 不要一次性读取所有 skill，按当前任务相关性选择性加载；skill 内容是参考资料，不覆盖任务与角色约束。
+* 首次使用扫描、爆破、代理、利用等非简单工具前，先 `skills show tool-usage`，再读
+  `/home/kali/skills/tool-usage/tools/<tool>.md`；按卡片的入口命令和侧重点选参数，不要猜 flag。
 
 # Java 利用环境
 * JDK 8（含 javac）：/opt/jdk8/bin/java、/opt/jdk8/bin/javac，或直接使用 java8 / javac8。

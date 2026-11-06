@@ -69,8 +69,8 @@ diff -ruN upstream/pkg/result.go build-src/pkg/result.go
  	HttpConn   *http.Client      `json:"-"`
 diff -ruN upstream/pkg/summary.go build-src/pkg/summary.go
 --- upstream/pkg/summary.go	1970-01-01 08:00:00
-+++ build-src/pkg/summary.go	2026-11-06 10:42:46
-@@ -0,0 +1,207 @@
++++ build-src/pkg/summary.go	2026-11-06 15:12:55
+@@ -0,0 +1,229 @@
 +package pkg
 +
 +import (
@@ -89,17 +89,23 @@ diff -ruN upstream/pkg/summary.go build-src/pkg/summary.go
 +// ScanTargetSummary is the machine-readable coverage record for one target.
 +// Tested counts unique numeric ports that reached a scan outcome; open_ports
 +// lists only ports confirmed open. Closed, filtered, error and unknown are
-+// distinct: only closed is evidence that a port is not listening.
++// distinct: only closed is evidence that a port is not listening. The per-state
++// port lists let callers audit and selectively re-check an outcome without
++// rescanning the whole scope.
 +type ScanTargetSummary struct {
-+	Tested    int            `json:"tested"`
-+	Open      int            `json:"open"`
-+	Closed    int            `json:"closed"`
-+	Filtered  int            `json:"filtered"`
-+	Error     int            `json:"error"`
-+	Unknown   int            `json:"unknown"`
-+	Excluded  int            `json:"excluded"`
-+	OpenPorts []string       `json:"open_ports"`
-+	Special   map[string]int `json:"special,omitempty"`
++	Tested        int            `json:"tested"`
++	Open          int            `json:"open"`
++	Closed        int            `json:"closed"`
++	Filtered      int            `json:"filtered"`
++	Error         int            `json:"error"`
++	Unknown       int            `json:"unknown"`
++	Excluded      int            `json:"excluded"`
++	OpenPorts     []string       `json:"open_ports"`
++	ClosedPorts   []string       `json:"closed_ports"`
++	FilteredPorts []string       `json:"filtered_ports"`
++	ErrorPorts    []string       `json:"error_ports"`
++	UnknownPorts  []string       `json:"unknown_ports"`
++	Special       map[string]int `json:"special,omitempty"`
 +
 +	ports map[string]string
 +}
@@ -254,6 +260,10 @@ diff -ruN upstream/pkg/summary.go build-src/pkg/summary.go
 +	record.Error = 0
 +	record.Unknown = 0
 +	record.OpenPorts = record.OpenPorts[:0]
++	record.ClosedPorts = record.ClosedPorts[:0]
++	record.FilteredPorts = record.FilteredPorts[:0]
++	record.ErrorPorts = record.ErrorPorts[:0]
++	record.UnknownPorts = record.UnknownPorts[:0]
 +	for port, state := range record.ports {
 +		switch state {
 +		case "open":
@@ -261,33 +271,46 @@ diff -ruN upstream/pkg/summary.go build-src/pkg/summary.go
 +			record.OpenPorts = append(record.OpenPorts, port)
 +		case "closed":
 +			record.Closed++
++			record.ClosedPorts = append(record.ClosedPorts, port)
 +		case "filtered":
 +			record.Filtered++
++			record.FilteredPorts = append(record.FilteredPorts, port)
 +		case "error":
 +			record.Error++
++			record.ErrorPorts = append(record.ErrorPorts, port)
 +		default:
 +			record.Unknown++
++			record.UnknownPorts = append(record.UnknownPorts, port)
 +		}
 +	}
-+	sort.Slice(record.OpenPorts, func(i, j int) bool {
-+		left, _ := strconv.Atoi(record.OpenPorts[i])
-+		right, _ := strconv.Atoi(record.OpenPorts[j])
-+		return left < right
-+	})
++	sortPorts(record.OpenPorts)
++	sortPorts(record.ClosedPorts)
++	sortPorts(record.FilteredPorts)
++	sortPorts(record.ErrorPorts)
++	sortPorts(record.UnknownPorts)
 +	if len(record.Special) == 0 {
 +		record.Special = nil
 +	}
 +}
++
++func sortPorts(ports []string) {
++	sort.Slice(ports, func(i, j int) bool {
++		left, _ := strconv.Atoi(ports[i])
++		right, _ := strconv.Atoi(ports[j])
++		return left < right
++	})
++}
 diff -ruN upstream/pkg/summary_test.go build-src/pkg/summary_test.go
 --- upstream/pkg/summary_test.go	1970-01-01 08:00:00
-+++ build-src/pkg/summary_test.go	2026-11-06 10:45:04
-@@ -0,0 +1,110 @@
++++ build-src/pkg/summary_test.go	2026-11-06 16:19:57
+@@ -0,0 +1,161 @@
 +package pkg
 +
 +import (
 +	"encoding/json"
 +	"os"
 +	"path/filepath"
++	"reflect"
 +	"testing"
 +
 +	"github.com/chainreactors/utils/parsers"
@@ -382,6 +405,56 @@ diff -ruN upstream/pkg/summary_test.go build-src/pkg/summary_test.go
 +	}
 +	if record.Open != 1 || record.Closed != 0 {
 +		t.Errorf("open/closed = %d/%d, want 1/0", record.Open, record.Closed)
++	}
++}
++
++func TestScanSummaryListsPerStatePorts(t *testing.T) {
++	ResetScanSummary()
++	open := scanResult("10.0.0.1", "443")
++	open.Open = true
++	refusedHigh := scanResult("10.0.0.1", "8080")
++	refusedHigh.Error = "connection refused"
++	refusedLow := scanResult("10.0.0.1", "80")
++	refusedLow.Error = "connection refused"
++	timeout := scanResult("10.0.0.1", "22")
++	timeout.Error = "i/o timeout"
++	denied := scanResult("10.0.0.1", "2375")
++	denied.Error = "permission denied"
++	unknown := scanResult("10.0.0.1", "9000")
++	for _, result := range []*Result{open, refusedHigh, refusedLow, timeout, denied, unknown} {
++		RecordScanResult(result)
++	}
++
++	path := filepath.Join(t.TempDir(), "summary.json")
++	if err := WriteScanSummary(path); err != nil {
++		t.Fatalf("write summary: %v", err)
++	}
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatalf("read summary: %v", err)
++	}
++	var summary ScanSummary
++	if err := json.Unmarshal(payload, &summary); err != nil {
++		t.Fatalf("decode summary: %v", err)
++	}
++	record := summary.Targets["10.0.0.1"]
++	if record == nil {
++		t.Fatal("missing target 10.0.0.1")
++	}
++	for _, test := range []struct {
++		name string
++		got  []string
++		want []string
++	}{
++		{"open", record.OpenPorts, []string{"443"}},
++		{"closed", record.ClosedPorts, []string{"80", "8080"}},
++		{"filtered", record.FilteredPorts, []string{"22"}},
++		{"error", record.ErrorPorts, []string{"2375"}},
++		{"unknown", record.UnknownPorts, []string{"9000"}},
++	} {
++		if !reflect.DeepEqual(test.got, test.want) {
++			t.Errorf("%s ports = %v, want %v", test.name, test.got, test.want)
++		}
 +	}
 +}
 +

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/chainreactors/utils/parsers"
@@ -98,6 +99,56 @@ func TestScanSummaryDeduplicatesPorts(t *testing.T) {
 	}
 	if record.Open != 1 || record.Closed != 0 {
 		t.Errorf("open/closed = %d/%d, want 1/0", record.Open, record.Closed)
+	}
+}
+
+func TestScanSummaryListsPerStatePorts(t *testing.T) {
+	ResetScanSummary()
+	open := scanResult("10.0.0.1", "443")
+	open.Open = true
+	refusedHigh := scanResult("10.0.0.1", "8080")
+	refusedHigh.Error = "connection refused"
+	refusedLow := scanResult("10.0.0.1", "80")
+	refusedLow.Error = "connection refused"
+	timeout := scanResult("10.0.0.1", "22")
+	timeout.Error = "i/o timeout"
+	denied := scanResult("10.0.0.1", "2375")
+	denied.Error = "permission denied"
+	unknown := scanResult("10.0.0.1", "9000")
+	for _, result := range []*Result{open, refusedHigh, refusedLow, timeout, denied, unknown} {
+		RecordScanResult(result)
+	}
+
+	path := filepath.Join(t.TempDir(), "summary.json")
+	if err := WriteScanSummary(path); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read summary: %v", err)
+	}
+	var summary ScanSummary
+	if err := json.Unmarshal(payload, &summary); err != nil {
+		t.Fatalf("decode summary: %v", err)
+	}
+	record := summary.Targets["10.0.0.1"]
+	if record == nil {
+		t.Fatal("missing target 10.0.0.1")
+	}
+	for _, test := range []struct {
+		name string
+		got  []string
+		want []string
+	}{
+		{"open", record.OpenPorts, []string{"443"}},
+		{"closed", record.ClosedPorts, []string{"80", "8080"}},
+		{"filtered", record.FilteredPorts, []string{"22"}},
+		{"error", record.ErrorPorts, []string{"2375"}},
+		{"unknown", record.UnknownPorts, []string{"9000"}},
+	} {
+		if !reflect.DeepEqual(test.got, test.want) {
+			t.Errorf("%s ports = %v, want %v", test.name, test.got, test.want)
+		}
 	}
 }
 

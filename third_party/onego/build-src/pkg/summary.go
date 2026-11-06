@@ -16,17 +16,23 @@ const ScanSummarySchema = "onego.scan-summary.v1"
 // ScanTargetSummary is the machine-readable coverage record for one target.
 // Tested counts unique numeric ports that reached a scan outcome; open_ports
 // lists only ports confirmed open. Closed, filtered, error and unknown are
-// distinct: only closed is evidence that a port is not listening.
+// distinct: only closed is evidence that a port is not listening. The per-state
+// port lists let callers audit and selectively re-check an outcome without
+// rescanning the whole scope.
 type ScanTargetSummary struct {
-	Tested    int            `json:"tested"`
-	Open      int            `json:"open"`
-	Closed    int            `json:"closed"`
-	Filtered  int            `json:"filtered"`
-	Error     int            `json:"error"`
-	Unknown   int            `json:"unknown"`
-	Excluded  int            `json:"excluded"`
-	OpenPorts []string       `json:"open_ports"`
-	Special   map[string]int `json:"special,omitempty"`
+	Tested        int            `json:"tested"`
+	Open          int            `json:"open"`
+	Closed        int            `json:"closed"`
+	Filtered      int            `json:"filtered"`
+	Error         int            `json:"error"`
+	Unknown       int            `json:"unknown"`
+	Excluded      int            `json:"excluded"`
+	OpenPorts     []string       `json:"open_ports"`
+	ClosedPorts   []string       `json:"closed_ports"`
+	FilteredPorts []string       `json:"filtered_ports"`
+	ErrorPorts    []string       `json:"error_ports"`
+	UnknownPorts  []string       `json:"unknown_ports"`
+	Special       map[string]int `json:"special,omitempty"`
 
 	ports map[string]string
 }
@@ -181,6 +187,10 @@ func finalize(record *ScanTargetSummary) {
 	record.Error = 0
 	record.Unknown = 0
 	record.OpenPorts = record.OpenPorts[:0]
+	record.ClosedPorts = record.ClosedPorts[:0]
+	record.FilteredPorts = record.FilteredPorts[:0]
+	record.ErrorPorts = record.ErrorPorts[:0]
+	record.UnknownPorts = record.UnknownPorts[:0]
 	for port, state := range record.ports {
 		switch state {
 		case "open":
@@ -188,20 +198,32 @@ func finalize(record *ScanTargetSummary) {
 			record.OpenPorts = append(record.OpenPorts, port)
 		case "closed":
 			record.Closed++
+			record.ClosedPorts = append(record.ClosedPorts, port)
 		case "filtered":
 			record.Filtered++
+			record.FilteredPorts = append(record.FilteredPorts, port)
 		case "error":
 			record.Error++
+			record.ErrorPorts = append(record.ErrorPorts, port)
 		default:
 			record.Unknown++
+			record.UnknownPorts = append(record.UnknownPorts, port)
 		}
 	}
-	sort.Slice(record.OpenPorts, func(i, j int) bool {
-		left, _ := strconv.Atoi(record.OpenPorts[i])
-		right, _ := strconv.Atoi(record.OpenPorts[j])
-		return left < right
-	})
+	sortPorts(record.OpenPorts)
+	sortPorts(record.ClosedPorts)
+	sortPorts(record.FilteredPorts)
+	sortPorts(record.ErrorPorts)
+	sortPorts(record.UnknownPorts)
 	if len(record.Special) == 0 {
 		record.Special = nil
 	}
+}
+
+func sortPorts(ports []string) {
+	sort.Slice(ports, func(i, j int) bool {
+		left, _ := strconv.Atoi(ports[i])
+		right, _ := strconv.Atoi(ports[j])
+		return left < right
+	})
 }

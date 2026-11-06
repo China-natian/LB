@@ -6,7 +6,8 @@ This directory pins the scanner used as LB's default TCP discovery engine.
 - `build-src/` - the same source plus `patches/0001-scan-summary.patch`.
 - `patches/0001-scan-summary.patch` - machine-readable scan summary:
   `--summary <file>` writes `onego.scan-summary.v1` with per-target
-  `tested/open/closed/filtered/error/unknown/excluded` and `open_ports`.
+  `tested/open/closed/filtered/error/unknown/excluded` plus the matching
+  `open_ports/closed_ports/filtered_ports/error_ports/unknown_ports` lists.
 - `LICENSE`, `README.upstream.md` - upstream license and documentation.
 
 ## Build
